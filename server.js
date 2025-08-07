@@ -1,167 +1,98 @@
-// server.js
-
-// 1. Import necessary packages
+// =================================================================
+// 1. IMPORT NECESSARY PACKAGES
+// =================================================================
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
-require('dotenv').config(); // To use environment variables from .env file
+const bodyParser = require('body-parser'); // You had this in your package.json, so let's use it
+require('dotenv').config(); // Allows us to use environment variables from a .env file
 
-// 2. Setup Express App
+// =================================================================
+// 2. SETUP EXPRESS APP AND MIDDLEWARE
+// =================================================================
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Use port from hosting service or 3000 locally
 
-// 3. Middleware
-app.use(cors()); // Allow cross-origin requests
-app.use(express.json()); // Allow the server to understand JSON data
+// Middleware should be declared only ONCE at the top
+app.use(cors()); // Allows your frontend to communicate with this backend
+app.use(bodyParser.urlencoded({ extended: true })); // Helps parse data from your HTML form
+app.use(bodyParser.json()); // Helps parse data if it's sent as JSON
 
-// 4. Create an API endpoint for booking
-app.post('/book-counselling', async (req, res) => {
-    // Destructure the data from the request body
-    const { fullName, emailAddress, phoneNumber, studyDestination, selectedDate, selectedTime, timezone } = req.body;
+// =================================================================
+// 3. CONFIGURE NODEMAILER (EMAIL SENDER)
+// =================================================================
+// We create the transporter object once and reuse it in all our routes.
+// IMPORTANT: For this to work, you must set these environment variables in Render.
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER, // Your Gmail address
+        pass: process.env.EMAIL_PASS  // Your Gmail "App Password"
+    },
+});
+
+// =================================================================
+// 4. DEFINE API ROUTES (ENDPOINTS)
+// =================================================================
+
+// --- THIS IS THE ENDPOINT FOR YOUR COUNSELLING FORM ---
+app.post('/submit-form', async (req, res) => {
+    console.log('Counselling form data received:', req.body);
+
+    // Destructure the data from your specific form
+    const {
+        fullName,
+        address,
+        email,
+        countryCode,
+        phone,
+        studyDestination,
+        level,
+        proficiencyTest,
+    } = req.body;
 
     // Basic validation
-    if (!fullName || !emailAddress || !selectedDate || !selectedTime) {
+    if (!fullName || !email || !phone || !studyDestination) {
         return res.status(400).send('Missing required fields.');
     }
 
-    // 5. Configure Nodemailer to send email
-    // IMPORTANT: Use environment variables for your email credentials
-    const transporter = nodemailer.createTransport({
-        service: 'gmail', // Or your email provider
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS, // Use a Gmail "App Password" here, not your regular password
-        },
-    });
-
-    // 6. Define the email content
+    // Define the email content
     const mailOptions = {
-        from: `"Nexus Enquiry Bot" <${process.env.EMAIL_USER}>`,
-        to: process.env.RECIPIENT_EMAIL, // Your email where you want to receive enquiries
-        subject: `New Counselling Booking from ${fullName}`,
+        from: `"Enquiry Bot" <${process.env.EMAIL_USER}>`,
+        to: process.env.RECIPIENT_EMAIL, // The email where you want to receive the form data
+        replyTo: email, // This makes it easy to reply directly to the user
+        subject: `Free Counselling Inquiry from ${fullName}`,
         html: `
-            <h2>New Counselling Request</h2>
-            <p>You have received a new booking request with the following details:</p>
+            <h2>New Free Counselling Inquiry</h2>
+            <p>You have received a new inquiry with the following details:</p>
             <ul>
                 <li><strong>Full Name:</strong> ${fullName}</li>
-                <li><strong>Email:</strong> ${emailAddress}</li>
-                <li><strong>Phone Number:</strong> ${phoneNumber}</li>
-                <li><strong>Preferred Destination:</strong> ${studyDestination}</li>
-                <li><strong>Booking Date:</strong> ${selectedDate}</li>
-                <li><strong>Booking Time:</strong> ${selectedTime}</li>
-                <li><strong>Client Timezone:</strong> ${timezone}</li>
+                <li><strong>Email Address:</strong> ${email}</li>
+                <li><strong>Address:</strong> ${address}</li>
+                <li><strong>Phone Number:</strong> ${countryCode} ${phone}</li>
+                <li><strong>Planning to Study In:</strong> ${studyDestination}</li>
+                <li><strong>Interested Level:</strong> ${level}</li>
+                <li><strong>Proficiency Test:</strong> ${proficiencyTest}</li>
             </ul>
         `,
     };
 
-    // 7. Send the email and respond to the frontend
+    // Send the email and respond to the frontend
     try {
         await transporter.sendMail(mailOptions);
-        res.status(200).send('Booking successful! We will be in touch shortly.');
+        console.log('Email sent successfully!');
+        // You can redirect to a thank-you page or just send a success message
+        res.status(200).send('Thank you! Your inquiry has been sent successfully.');
     } catch (error) {
         console.error('Error sending email:', error);
-        res.status(500).send('An error occurred while sending the message. Please try again.');
-    }
-});
-
-// 3. Middleware (already there)
-app.use(cors());
-app.use(express.json());
-
-// --- YOUR EXISTING /book-counselling ENDPOINT STAYS HERE ---
-app.post('/book-counselling', async (req, res) => {
-    // ... all the code for the counselling form is here ...
-    // ... NO CHANGES NEEDED IN THIS BLOCK ...
-    const { fullName, emailAddress, phoneNumber, studyDestination, selectedDate, selectedTime, timezone } = req.body;
-    if (!fullName || !emailAddress || !selectedDate || !selectedTime) {
-        return res.status(400).send('Missing required fields.');
-    }
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-        },
-    });
-    const mailOptions = {
-        from: `"Nexus Enquiry Bot" <${process.env.EMAIL_USER}>`,
-        to: process.env.RECIPIENT_EMAIL,
-        subject: `New Counselling Booking from ${fullName}`,
-        html: `
-            <h2>New Counselling Request</h2>
-            <p>You have received a new booking request with the following details:</p>
-            <ul>
-                <li><strong>Full Name:</strong> ${fullName}</li>
-                <li><strong>Email:</strong> ${emailAddress}</li>
-                <li><strong>Phone Number:</strong> ${phoneNumber}</li>
-                <li><strong>Preferred Destination:</strong> ${studyDestination}</li>
-                <li><strong>Booking Date:</strong> ${selectedDate}</li>
-                <li><strong>Booking Time:</strong> ${selectedTime}</li>
-                <li><strong>Client Timezone:</strong> ${timezone}</li>
-            </ul>
-        `,
-    };
-    try {
-        await transporter.sendMail(mailOptions);
-        res.status(200).send('Booking successful! We will be in touch shortly.');
-    } catch (error) {
-        console.error('Error sending email:', error);
-        res.status(500).send('An error occurred while sending the message. Please try again.');
+        res.status(500).send('An error occurred while sending your message. Please try again.');
     }
 });
 
 
-// --- ADD THIS NEW ENDPOINT FOR THE CONTACT FORM ---
-app.post('/send-contact-email', async (req, res) => {
-    // Destructure data from the contact form
-    const { firstName, lastName, email, subject, message } = req.body;
-
-    // Validation
-    if (!firstName || !lastName || !email || !subject || !message) {
-        return res.status(400).send('Please fill out all required fields.');
-    }
-
-    // Use the same Nodemailer transporter configuration
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-        },
-    });
-
-    // Create the email content for the contact form submission
-    const mailOptions = {
-        from: `"${firstName} ${lastName}" <${process.env.EMAIL_USER}>`,
-        to: process.env.RECIPIENT_EMAIL,
-        replyTo: email, // Set the "reply-to" to the user's email
-        subject: `Contact Form: ${subject}`,
-        html: `
-            <h2>New Contact Form Submission</h2>
-            <p>You have received a new message from your website's contact form:</p>
-            <ul>
-                <li><strong>From:</strong> ${firstName} ${lastName}</li>
-                <li><strong>Email:</strong> ${email}</li>
-                <li><strong>Subject:</strong> ${subject}</li>
-            </ul>
-            <hr>
-            <h3>Message:</h3>
-            <p style="white-space: pre-wrap;">${message}</p>
-        `,
-    };
-
-    // Send the email
-    try {
-        await transporter.sendMail(mailOptions);
-        res.status(200).send('Message sent successfully! Thank you for reaching out.');
-    } catch (error) {
-        console.error('Error sending contact email:', error);
-        res.status(500).send('An error occurred while sending your message.');
-    }
-});
-
-
-// 8. Start the server (already there)
+// =================================================================
+// 5. START THE SERVER
+// =================================================================
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`Server is running successfully on port ${PORT}`);
 });
