@@ -4,30 +4,27 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
-const bodyParser = require('body-parser'); // You had this in your package.json, so let's use it
-require('dotenv').config(); // Allows us to use environment variables from a .env file
+const bodyParser = require('body-parser');
+require('dotenv').config();
 
 // =================================================================
 // 2. SETUP EXPRESS APP AND MIDDLEWARE
 // =================================================================
 const app = express();
-const PORT = process.env.PORT || 3000; // Use port from hosting service or 3000 locally
+const PORT = process.env.PORT || 3000;
 
-// Middleware should be declared only ONCE at the top
-app.use(cors()); // Allows your frontend to communicate with this backend
-app.use(bodyParser.urlencoded({ extended: true })); // Helps parse data from your HTML form
-app.use(bodyParser.json()); // Helps parse data if it's sent as JSON
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
 // =================================================================
-// 3. CONFIGURE NODEMAILER (EMAIL SENDER)
+// 3. CONFIGURE NODEMAILER (REUSABLE FOR ALL ROUTES)
 // =================================================================
-// We create the transporter object once and reuse it in all our routes.
-// IMPORTANT: For this to work, you must set these environment variables in Render.
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // Your Gmail address
-        pass: process.env.EMAIL_PASS  // Your Gmail "App Password"
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     },
 });
 
@@ -35,57 +32,70 @@ const transporter = nodemailer.createTransport({
 // 4. DEFINE API ROUTES (ENDPOINTS)
 // =================================================================
 
-// --- THIS IS THE ENDPOINT FOR YOUR COUNSELLING FORM ---
+// --- ROUTE 1: FOR THE FREE COUNSELLING FORM ---
+// This route is already working perfectly. No changes needed here.
 app.post('/submit-form', async (req, res) => {
     console.log('Counselling form data received:', req.body);
+    const { fullName, address, email, countryCode, phone, studyDestination, level, proficiencyTest } = req.body;
 
-    // Destructure the data from your specific form
-    const {
-        fullName,
-        address,
-        email,
-        countryCode,
-        phone,
-        studyDestination,
-        level,
-        proficiencyTest,
-    } = req.body;
-
-    // Basic validation
     if (!fullName || !email || !phone || !studyDestination) {
         return res.status(400).send('Missing required fields.');
     }
 
-    // Define the email content
     const mailOptions = {
         from: `"Enquiry Bot" <${process.env.EMAIL_USER}>`,
-        to: process.env.RECIPIENT_EMAIL, // The email where you want to receive the form data
-        replyTo: email, // This makes it easy to reply directly to the user
+        to: process.env.RECIPIENT_EMAIL,
+        replyTo: email,
         subject: `Free Counselling Inquiry from ${fullName}`,
+        html: `<h2>New Free Counselling Inquiry</h2><p>Details:</p><ul><li><strong>Full Name:</strong> ${fullName}</li><li><strong>Email:</strong> ${email}</li><li><strong>Address:</strong> ${address}</li><li><strong>Phone:</strong> ${countryCode} ${phone}</li><li><strong>Destination:</strong> ${studyDestination}</li><li><strong>Level:</strong> ${level}</li><li><strong>Test:</strong> ${proficiencyTest}</li></ul>`,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        res.status(200).send('Thank you! Your inquiry has been sent successfully.');
+    } catch (error) {
+        console.error('Error sending counselling email:', error);
+        res.status(500).send('An error occurred while sending your message. Please try again.');
+    }
+});
+
+
+// --- ROUTE 2: FOR THE NEW CONTACT US FORM ---
+// This is the new block of code you are adding.
+app.post('/send-contact-email', async (req, res) => {
+    console.log('Contact form data received:', req.body);
+
+    // Destructure data from the contact form
+    const { firstName, lastName, email, subject, message } = req.body;
+
+    // Validation
+    if (!firstName || !lastName || !email || !subject || !message) {
+        return res.status(400).send('Please fill out all required fields.');
+    }
+
+    // Create the email content for the contact form
+    const mailOptions = {
+        from: `"Enquiry Bot" <${process.env.EMAIL_USER}>`,
+        to: process.env.RECIPIENT_EMAIL,
+        replyTo: email, // Set the "reply-to" to the user's email
+        subject: `Contact Form Message: ${subject}`,
         html: `
-            <h2>New Free Counselling Inquiry</h2>
-            <p>You have received a new inquiry with the following details:</p>
-            <ul>
-                <li><strong>Full Name:</strong> ${fullName}</li>
-                <li><strong>Email Address:</strong> ${email}</li>
-                <li><strong>Address:</strong> ${address}</li>
-                <li><strong>Phone Number:</strong> ${countryCode} ${phone}</li>
-                <li><strong>Planning to Study In:</strong> ${studyDestination}</li>
-                <li><strong>Interested Level:</strong> ${level}</li>
-                <li><strong>Proficiency Test:</strong> ${proficiencyTest}</li>
-            </ul>
+            <h2>New Contact Form Submission</h2>
+            <p>From: <strong>${firstName} ${lastName}</strong></p>
+            <p>Email: <strong>${email}</strong></p>
+            <hr>
+            <h3>Message:</h3>
+            <p style="white-space: pre-wrap;">${message}</p>
         `,
     };
 
-    // Send the email and respond to the frontend
+    // Send the email using the same transporter
     try {
         await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully!');
-        // You can redirect to a thank-you page or just send a success message
-        res.status(200).send('Thank you! Your inquiry has been sent successfully.');
+        res.status(200).send('Message sent successfully! Thank you for reaching out.');
     } catch (error) {
-        console.error('Error sending email:', error);
-        res.status(500).send('An error occurred while sending your message. Please try again.');
+        console.error('Error sending contact email:', error);
+        res.status(500).send('An error occurred while sending your message.');
     }
 });
 
