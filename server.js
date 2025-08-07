@@ -1,5 +1,5 @@
 // =================================================================
-// 1. IMPORT NECESSARY PACKAGES
+// 1. IMPORT PACKAGES
 // =================================================================
 const express = require('express');
 const nodemailer = require('nodemailer');
@@ -8,7 +8,7 @@ const bodyParser = require('body-parser');
 require('dotenv').config();
 
 // =================================================================
-// 2. SETUP EXPRESS APP AND MIDDLEWARE
+// 2. SETUP EXPRESS APP
 // =================================================================
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,7 +18,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // =================================================================
-// 3. CONFIGURE NODEMAILER (REUSABLE FOR ALL ROUTES)
+// 3. CONFIGURE NODEMAILER (REUSABLE)
 // =================================================================
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -29,67 +29,44 @@ const transporter = nodemailer.createTransport({
 });
 
 // =================================================================
-// 4. DEFINE API ROUTES (ENDPOINTS)
+// 4. API ROUTES (ENDPOINTS)
 // =================================================================
 
-// --- ROUTE 1: FOR THE FREE COUNSELLING FORM ---
-// This route is already working perfectly. No changes needed here.
+// --- ROUTE 1: FOR THE "START NOW" (FREE COUNSELLING) FORM ---
 app.post('/submit-form', async (req, res) => {
     console.log('Counselling form data received:', req.body);
+    // ... (This code remains unchanged)
     const { fullName, address, email, countryCode, phone, studyDestination, level, proficiencyTest } = req.body;
-
-    if (!fullName || !email || !phone || !studyDestination) {
-        return res.status(400).send('Missing required fields.');
-    }
-
+    if (!fullName || !email || !phone) { return res.status(400).send('Missing required fields.'); }
     const mailOptions = {
         from: `"Enquiry Bot" <${process.env.EMAIL_USER}>`,
         to: process.env.RECIPIENT_EMAIL,
         replyTo: email,
         subject: `Free Counselling Inquiry from ${fullName}`,
-        html: `<h2>New Free Counselling Inquiry</h2><p>Details:</p><ul><li><strong>Full Name:</strong> ${fullName}</li><li><strong>Email:</strong> ${email}</li><li><strong>Address:</strong> ${address}</li><li><strong>Phone:</strong> ${countryCode} ${phone}</li><li><strong>Destination:</strong> ${studyDestination}</li><li><strong>Level:</strong> ${level}</li><li><strong>Test:</strong> ${proficiencyTest}</li></ul>`,
+        html: `<h2>New Free Counselling Inquiry</h2><ul><li><strong>Full Name:</strong> ${fullName}</li><li><strong>Email:</strong> ${email}</li><li><strong>Address:</strong> ${address}</li><li><strong>Phone:</strong> ${countryCode} ${phone}</li><li><strong>Destination:</strong> ${studyDestination}</li><li><strong>Level:</strong> ${level}</li><li><strong>Test:</strong> ${proficiencyTest}</li></ul>`,
     };
-
     try {
         await transporter.sendMail(mailOptions);
         res.status(200).send('Thank you! Your inquiry has been sent successfully.');
     } catch (error) {
         console.error('Error sending counselling email:', error);
-        res.status(500).send('An error occurred while sending your message. Please try again.');
+        res.status(500).send('An error occurred while sending your message.');
     }
 });
 
-
-// --- ROUTE 2: FOR THE NEW CONTACT US FORM ---
-// This is the new block of code you are adding.
+// --- ROUTE 2: FOR THE "CONTACT US" FORM ---
 app.post('/send-contact-email', async (req, res) => {
     console.log('Contact form data received:', req.body);
-
-    // Destructure data from the contact form
+    // ... (This code remains unchanged)
     const { firstName, lastName, email, subject, message } = req.body;
-
-    // Validation
-    if (!firstName || !lastName || !email || !subject || !message) {
-        return res.status(400).send('Please fill out all required fields.');
-    }
-
-    // Create the email content for the contact form
+    if (!firstName || !email || !subject || !message) { return res.status(400).send('Missing required fields.'); }
     const mailOptions = {
         from: `"Enquiry Bot" <${process.env.EMAIL_USER}>`,
         to: process.env.RECIPIENT_EMAIL,
-        replyTo: email, // Set the "reply-to" to the user's email
+        replyTo: email,
         subject: `Contact Form Message: ${subject}`,
-        html: `
-            <h2>New Contact Form Submission</h2>
-            <p>From: <strong>${firstName} ${lastName}</strong></p>
-            <p>Email: <strong>${email}</strong></p>
-            <hr>
-            <h3>Message:</h3>
-            <p style="white-space: pre-wrap;">${message}</p>
-        `,
+        html: `<h2>New Contact Form Submission</h2><p>From: <strong>${firstName} ${lastName}</strong></p><p>Email: <strong>${email}</strong></p><hr><h3>Message:</h3><p style="white-space: pre-wrap;">${message}</p>`,
     };
-
-    // Send the email using the same transporter
     try {
         await transporter.sendMail(mailOptions);
         res.status(200).send('Message sent successfully! Thank you for reaching out.');
@@ -99,6 +76,49 @@ app.post('/send-contact-email', async (req, res) => {
     }
 });
 
+// --- ROUTE 3: FOR THE NEW BOOKING FORM (WITH CALENDAR) ---
+// This is the new block of code you are adding.
+app.post('/book-counselling', async (req, res) => {
+    console.log('Booking form data received:', req.body);
+
+    // Destructure data from the booking form
+    const { fullName, emailAddress, phoneNumber, studyDestination, selectedDate, selectedTime, timezone } = req.body;
+
+    // Validation
+    if (!fullName || !emailAddress || !phoneNumber || !selectedDate || !selectedTime) {
+        return res.status(400).send('Missing required fields from booking form.');
+    }
+
+    // Create the email content for the booking
+    const mailOptions = {
+        from: `"Booking Bot" <${process.env.EMAIL_USER}>`,
+        to: process.env.RECIPIENT_EMAIL,
+        replyTo: emailAddress,
+        subject: `New Online Counselling Booking from ${fullName}`,
+        html: `
+            <h2>New Online Counselling Booking Request</h2>
+            <p>You have received a new booking with the following details:</p>
+            <ul>
+                <li><strong>Full Name:</strong> ${fullName}</li>
+                <li><strong>Email:</strong> ${emailAddress}</li>
+                <li><strong>Phone Number:</strong> ${phoneNumber}</li>
+                <li><strong>Preferred Destination:</strong> ${studyDestination}</li>
+                <li><strong>Booking Date:</strong> ${selectedDate}</li>
+                <li><strong>Booking Time:</strong> ${selectedTime}</li>
+                <li><strong>Client Timezone:</strong> ${timezone}</li>
+            </ul>
+        `,
+    };
+
+    // Send the email using the same transporter
+    try {
+        await transporter.sendMail(mailOptions);
+        res.status(200).send('Booking successful! We will be in touch shortly.');
+    } catch (error) {
+        console.error('Error sending booking email:', error);
+        res.status(500).send('An error occurred while confirming your booking.');
+    }
+});
 
 // =================================================================
 // 5. START THE SERVER
