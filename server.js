@@ -4,7 +4,7 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
-const bodyParser = require('body-parser');
+const multer = require('multer'); // <-- 1. IMPORT MULTER
 require('dotenv').config();
 
 // =================================================================
@@ -12,10 +12,13 @@ require('dotenv').config();
 // =================================================================
 const app = express();
 const PORT = process.env.PORT || 3000;
+const upload = multer(); // <-- 2. INITIALIZE MULTER
 
+// Use built-in Express body parsers for JSON and URL-encoded data
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 
 // =================================================================
 // 3. CONFIGURE NODEMAILER (REUSABLE)
@@ -33,9 +36,10 @@ const transporter = nodemailer.createTransport({
 // =================================================================
 
 // --- ROUTE 1: FOR THE "START NOW" (FREE COUNSELLING) FORM ---
-app.post('/submit-form', async (req, res) => {
-    console.log('Counselling form data received:', req.body);
-    // ... (This code remains unchanged)
+// <-- 3. ADD "upload.none()" MIDDLEWARE
+app.post('/submit-form', upload.none(), async (req, res) => {
+    console.log('Counselling form data received:', req.body); // This will now work correctly
+
     const { fullName, address, email, countryCode, phone, studyDestination, level, proficiencyTest } = req.body;
     if (!fullName || !email || !phone) { return res.status(400).send('Missing required fields.'); }
     const mailOptions = {
@@ -55,9 +59,10 @@ app.post('/submit-form', async (req, res) => {
 });
 
 // --- ROUTE 2: FOR THE "CONTACT US" FORM ---
-app.post('/send-contact-email', async (req, res) => {
+// <-- 3. ADD "upload.none()" MIDDLEWARE
+app.post('/send-contact-email', upload.none(), async (req, res) => {
     console.log('Contact form data received:', req.body);
-    // ... (This code remains unchanged)
+
     const { firstName, lastName, email, subject, message } = req.body;
     if (!firstName || !email || !subject || !message) { return res.status(400).send('Missing required fields.'); }
     const mailOptions = {
@@ -70,26 +75,22 @@ app.post('/send-contact-email', async (req, res) => {
     try {
         await transporter.sendMail(mailOptions);
         res.status(200).send('Message sent successfully! Thank you for reaching out.');
-    } catch (error) {
+    } catch (error)
+    {
         console.error('Error sending contact email:', error);
         res.status(500).send('An error occurred while sending your message.');
     }
 });
 
 // --- ROUTE 3: FOR THE NEW BOOKING FORM (WITH CALENDAR) ---
-// This is the new block of code you are adding.
-app.post('/book-counselling', async (req, res) => {
+// <-- 3. ADD "upload.none()" MIDDLEWARE
+app.post('/book-counselling', upload.none(), async (req, res) => {
     console.log('Booking form data received:', req.body);
 
-    // Destructure data from the booking form
     const { fullName, emailAddress, phoneNumber, studyDestination, selectedDate, selectedTime, timezone } = req.body;
-
-    // Validation
     if (!fullName || !emailAddress || !phoneNumber || !selectedDate || !selectedTime) {
         return res.status(400).send('Missing required fields from booking form.');
     }
-
-    // Create the email content for the booking
     const mailOptions = {
         from: `"Booking Bot" <${process.env.EMAIL_USER}>`,
         to: process.env.RECIPIENT_EMAIL,
@@ -109,8 +110,6 @@ app.post('/book-counselling', async (req, res) => {
             </ul>
         `,
     };
-
-    // Send the email using the same transporter
     try {
         await transporter.sendMail(mailOptions);
         res.status(200).send('Booking successful! We will be in touch shortly.');
